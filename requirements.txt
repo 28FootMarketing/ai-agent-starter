@@ -1,4 +1,8 @@
-sentence-transformers
+streamlit
+python-dotenv
 faiss-cpu
 PyPDF2
-openai
+sentence-transformers
+ollama
+requests
+
