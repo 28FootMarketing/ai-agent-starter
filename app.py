@@ -1,43 +1,45 @@
-import streamlit as st
-from dotenv import load_dotenv
+import requests
 import os
-import sys
+import json
+from typing import Dict, Any
 
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-# Load environment variables
-load_dotenv()
-
-# Load modules
-from utils.rag_chain_faiss import load_pdf_chunks, build_faiss_index, retrieve_context, ask_with_context
-from utils.ghl_webhook import send_to_ghl
-
-# Set Streamlit page config
-st.set_page_config(page_title="AI Recruiting Assistant", layout="wide")
-
-# Title
-st.title("🏈 AI Recruiting Assistant")
-st.markdown("Use this tool to ask recruiting questions and receive intelligent, personalized answers based on expert data.")
-
-# Load and embed recruiting FAQ
-st.info("Loading recruiting data...")
-chunks = load_pdf_chunks("data/recruiting_faqs.pdf")
-index, _ = build_faiss_index(chunks)
-st.success("Ready for questions!")
-
-# Ask the AI agent
-with st.expander("🧠 Ask a Recruiting Question"):
-    question = st.text_input("Type your question here:")
-
-    if question:
-        with st.spinner("Thinking..."):
-            context = retrieve_context(index, question, chunks)
-            answer = ask_with_context(question, " ".join(context))
-            st.markdown("### 🤖 Answer")
-            st.write(answer)
-
-            # Send interaction to GHL
-            send_to_ghl({
-                "question": question,
-                "answer": answer,
-                "tag": "RAG_Response"
-            })
+def send_to_ghl(data: Dict[str, Any]) -> bool:
+    """
+    Send data to GoHighLevel webhook
+    """
+    try:
+        # Get webhook URL from environment variables
+        webhook_url = os.getenv("GHL_WEBHOOK_URL")
+        
+        if not webhook_url:
+            print("Warning: GHL_WEBHOOK_URL not found in environment variables")
+            return False
+        
+        # Prepare payload
+        payload = {
+            "timestamp": str(pd.Timestamp.now()),
+            "source": "AI_Recruiting_Assistant",
+            **data
+        }
+        
+        # Send POST request
+        response = requests.post(
+            webhook_url,
+            json=payload,
+            headers={
+                "Content-Type": "application/json",
+                "User-Agent": "AI-Recruiting-Assistant/1.0"
+            },
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            print("Successfully sent data to GHL")
+            return True
+        else:
+            print(f"Failed to send data to GHL: {response.status_code}")
+            return False
+            
+    except Exception as e:
+        print(f"Error sending to GHL: {str(e)}")
+        return False
